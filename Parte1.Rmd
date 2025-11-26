@@ -126,3 +126,138 @@ Nuevos <- data.frame(PrctGrasa= c(25,50,75))
 predict(lm_1, Nuevos, interval = "confidence", level = 0.95)
 ```
 
+# Ejercicio 5
+Utilizando el banco de datos Auto, en el paquete de R ISLR, se desea explicar el consumo de carburante,
+variable mpg, a partir de la potencia del motor, variable horsepower.
+
+a) Dibuja el diagrama de dispersión y la recta de mínimos cuadrados.
+
+```{r}
+library(ISLR)
+
+lm_auto <- lm(mpg ~ horsepower, data=Auto)
+
+plot(Auto$horsepower, Auto$mpg, col='BLUE')
+abline(coef=coef(lm_auto), col='RED')
+
+summary(lm_auto)
+```
+
+
+b) ¿Hay relación entre esas dos variables? ¿Cómo de fuerte es esa relación? ¿Podemos afirmar si es
+positiva o negativa?
+
+```{r}
+print("El valor de R-squared es de 0.6059. Esto sugiere una relación entre las variables pero no es muy fuerte.")
+
+confint(lm_auto,level=0.95)
+print("Como vemos con el intervalo de confianza de 95% la pendiente es claramente negativa.")
+
+```
+
+c) ¿Qué consumo se espera si potencia del motor es 75? Proporciona el intervalo de confianza y el de
+predicción para esa potencia de motor.
+
+```{r}
+Nuevos5 <- data.frame(horsepower= 75)
+pred <- predict(lm_auto, Nuevos5, interval = "confidence", level = 0.95)
+cat("Con un intervalo de confianza de 95% obtenemos que el consumo esperado está entre", pred[1,"lwr"], "y", predict_5c[1,"upr"])
+```
+
+d) Analiza gráficamente los residuos y comenta los resultados. ¿Cómo lo arreglarías?
+
+```{r}
+plot(residuals(lm_auto), col = "blue", type = "l")
+abline(h=0,lty=2)
+```
+
+# Ejercicio 6
+El banco de datos cerebros es un banco de datos famoso. En él se recogen los pesos del cuerpo y del cerebro
+de diversos animales. Vamos a explicar el peso del cerebro (en g) cerebro a partir del peso del cuerpo (en
+Kg) cuerpo.
+
+a) Ajusta el modelo y realiza el diagnóstico del modelo.
+
+```{r}
+load("datosParte1.RData")
+
+# Tenemos que pasar a logaritmo si queremos hacer un ajuste lineal
+cuerpo_log <- log(cerebros$cuerpo)
+cerebro_log <-  log(cerebros$cerebro)
+
+lm_cerebros <- lm(cerebro_log ~ cuerpo_log, data=Auto)
+
+plot(cuerpo_log, cerebro_log, col='BLUE')
+abline(coef=coef(lm_cerebros), col='RED')
+
+summary(lm_cerebros)
+plot(cerebros$cerebro, cerebros$cuerpo)
+```
+
+b) Retira los datos que no pertenecen a la misma población que el resto y re-analiza.
+
+```{r}
+# Los datos que se separan más del resto son los de los dinosaurios y los elefantes, podemos probar a retirarlos
+
+cerebros <- cerebros[cerebros["Nombre"] != c("Braquiosaurio", "Diplodoco", "Triceratops"),]
+
+cuerpo_log <- log(cerebros$cuerpo)
+cerebro_log <-  log(cerebros$cerebro)
+
+lm_cerebros <- lm(cerebro_log ~ cuerpo_log, data=Auto)
+
+plot(cuerpo_log, cerebro_log, col='BLUE')
+abline(coef=coef(lm_cerebros), col='RED')
+
+summary(lm_cerebros)
+plot(cerebros$cerebro, cerebros$cuerpo)
+```
+# Ejercicio 7
+Utilizando los datos de mamíferos, del banco cerebros, y las variables en escala logarítmica, dibuja el
+diagrama de puntos con la recta de mínimos cuadrados. A continuación, analiza gráficamente los residuos
+¿crees que el modelo lineal sería adecuado?
+Suponiendo adecuado el modelo lineal, contesta a las siguientes preguntas:
+
+a) ¿Cuánto vale la pendiente de la recta? ¿Podemos afirmar que es positiva?
+
+```{r}
+# La pendiente la hemos calculado en el apartado anterior, tiene un valor de 0.4961
+
+confint(lm_cerebros,level=0.95)
+print("Como vemos con el intervalo de confianza de 95% la pendiente es claramente positivo")
+```
+
+b) Compara la varianza de la variable respuesta con la varianza de los residuos: ¿Qué porcentaje de la variabilidad
+inicial está explicado por la recta de mínimos cuadrados? ¿Qué porcentaje de la variabilidad
+inicial falta todavía por explicar?
+
+```{r}
+var(cerebro_log)
+var(residuals(lm_cerebros))
+
+# En este caso obtenemos R-squared de 0.922, tenemos el 92.2% explicado queda un 7.8% por explicar
+```
+
+c) Obtén los intervalos de confianza al 90% sobre los parámetros de la recta.
+
+```{r}
+confint(lm_cerebros,level=0.90)
+
+```
+
+d) Estima el valor de la recta de regresión en el punto log(cuerpo) = 3 y calcula su intervalo de confianza
+al 95%. Dibuja el diagrama de dispersión, la recta de regresión y las bandas de confianza al 95% sobre
+la estimación de la recta.
+
+```{r}
+Nuevos <- data.frame(cuerpo_log = 3)
+predict(lm_cerebros, Nuevos, interval = "confidence", level = 0.95)
+```
+
+e) Obtén la predicción puntual y por intervalos (al 95%) de un nuevo mamífero con log(cuerpo) = 6.
+Añade a la gráfica anterior las bandas de predicción.
+
+```{r}
+
+```
+
