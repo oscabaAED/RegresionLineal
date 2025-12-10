@@ -1,0 +1,98 @@
+---
+title: "Tarea"
+author: "Óscar Camacho, Juan Alcaraz"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+boston <- readxl::read_xlsx("./boston.xlsx")
+```
+
+
+# Ejercicio 1
+
+
+
+# Ejercicio 2
+
+## 2.1
+```{r 2.1}
+boston
+
+
+#Ajuste modelo. Hacemos log(crim) ya que los datos de crim no se distribuyen linealmente
+lm_b2 <- lm(log(crim) ~ medv, data = boston, na.action=na.exclude)
+
+#Representación del ajuste. Necesitamos volver a hacer log(crim) si queremos un ajuste lineal
+plot(boston$medv, log(boston$crim),
+     col="blue",
+     main="Relación Valor Vivienda - Criminalidad",
+     xlab="Valor Mediano de la Vivienda",
+     ylab="Tasa de Criminalidad")
+
+#Resumen Modelo
+summary(lm_b2)
+
+# Tenemos una relación negativa, al aumentar el precio medio de la vivienda disminuye la criminalidad logarítmicamente con una pendiente de -0.1092 y ordenada en el origen de 1.6954
+```
+
+## 2.2
+```{r 2.2}
+plot(boston$medv, log(boston$crim),
+     col="blue",
+     main="Relación Valor Vivienda - Criminalidad",
+     xlab="Valor Mediano de la Vivienda",
+     ylab="Tasa de Criminalidad")
+abline(coef=coef(lm_b2), col="red")
+
+summary(lm_b2)
+
+# Obtenemos un R2 de 0.2859, bastante bajo como para confirmar una correlación entre los datos.
+
+conf_90 <- confint(lm_b2,level=0.90)
+print(conf_90)
+# Como vemos con un intervalo de confianza de 90% la pendiente es claramente negativa.
+```
+
+## 2.3
+```{r 2.3}
+#Obtención de bandas de estimación:
+minx<-range(boston$medv)[1]; maxx<-range(boston$medv)[2]
+nuevos <- data.frame(list(medv = seq(minx,maxx,length=100)))
+bandas_est<-predict(lm_b2, newdata = nuevos, interval = "confidence")
+
+#Representación gráfica:
+plot(boston$medv, log(boston$crim), col='BLUE')
+abline(coef=coef(lm_b2), col='RED')
+lines(nuevos$medv,bandas_est[,2],col='BLACK')
+lines(nuevos$medv,bandas_est[,3],col='BLACK')
+```
+## 2.4
+```{r 2.4}
+residuos_2 <- residuals(lm_b2)
+predichos_2 <- fitted.values(lm_b2)
+plot(predichos_2,residuos_2, col='BLUE',main = 'Gráfica de residuos')
+abline(h=0,lty=2)
+
+# Análisis pendiente
+```
+
+## 2.5
+```{r 2.5}
+# No es adecuada regresión lineal, ya que los datos no siguen una distribución lineal. Debido a eso hemos decidido realizar una transformación logaritmica a la variable `crim`.
+```
+
+## 2.6
+```{r 2.6}
+nuevos2 <- data.frame(medv = c(30000, 10000, 100000)/10000) # los valores de medv son entre 10000$ 
+pred_2 <- predict(lm_b2, nuevos2, interval = "confidence", level = 0.90)
+cat("Con un intervalo de confianza de 90% obtenemos que la tasa de criminalidad esperada está entre", pred_2[1,"lwr"], "y", pred_2[1,"upr"]) # corregir esto
+```
+
+
+
