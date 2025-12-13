@@ -120,6 +120,9 @@ se observa que la mayoría de puntos caen en la recta, sin embargo hay un grupo 
 Por último, sobre los _outliers_ o datos atípicos, vemos en las gráficas que hay unos pocos datos con errores estandarizados y _studentizados_ mayores que $3$, lo cual nos hace pensar que podrían ser atípicos.
 
 ```{r Análisis de datos atípicos apartado 1.4}
+
+# ACORDARSE DE CORREGIR OUTLIERS
+
 # Gráfico de los Leverages
 n<-nrow(boston)
 plot(fitted(Modelo1_2),hatvalues(Modelo1_2),main="leverages vs fitted")
