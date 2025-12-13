@@ -11,11 +11,155 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 boston <- readxl::read_xlsx("./boston.xlsx")
+
+library(leaps)
+library(olsrr)
+```
+## IMPORTACIÓN DE LOS DATOS
+
+```{r Importación de las librerías}
+library(MASS)
+library(readxl)
+library(ggplot2)
+library(lmtest)
+library(car)
 ```
 
 
-# Ejercicio 1
+```{r Importación de los datos}
+boston <- read_excel("boston.xlsx", col_types = c("numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric"))
+boston$chas <- as.factor(boston$chas)
+```
 
+
+## EJERCICIO 1
+
+Para saber la variable que tiene mayor dependencia lineal de `crim` debemos usar la correlación, que en R se calcula con el comando `cor`. Entonces:
+
+```{r Calculo de la correlación ejercicio 1}
+# Debemos ver la fila de la matriz de correlaciones que corresponde con la variable crim
+# Hay que decir que hay una variable factor que debe eliminarse porque no tiene sentido calcular la correlación de una variable categórica y otra continua
+cor(boston[-3])["crim",]
+```
+Vemos que la que presenta el coeficiente de correlación con `crim` más elevado en valor absoluto es `indus`. Por tanto esta será nuestra variable para el ejercicio.
+
+### Apartado 1.1
+
+Debemos evaluar el efecto de la variable escogida, `indus`, sobre nuestra variable `crim`, entonces: 
+
+```{r Apartado 1.1}
+plot(boston$indus, boston$crim)
+```
+
+Tras ver la gráfica y viendo el coeficiente de correlación que es `r cor(boston[-3])["crim","indus"]`, vemos que es positivo es menor que $0.6$, lo cual nos indica que la relación será positiva pero débil. El aumento de la variable predictora generara un aumento en el valor de la variable respuesta pero sin ser muy notable.
+
+### Apartado 1.2
+
+Para obtener una recta de mínimos cuadrados usaremos el comando `lm()`.
+
+```{r Apartado 1.2}
+Modelo1_2 <- lm(crim~indus,data = boston)
+summary(Modelo1_2)
+```
+Con el comando `summary` podemos ver un resumen de los resultados obtenidos por el modelo:
+
+- **Coeficientes:** como era de esperar el término independiente del modelo tiene un valor elevado, mientras que el coeficiente de la variable predictora es pequeño, dejando claro que la influencia sobre la variable respuesta no es muy fuerte. Sin embargo el coeficiente no es nulo, a juzgar por los resultados de los contrastes de hipótesis hay una fuerte evidencia estadística en contra de la nulidad de los dos coeficientes.
+
+- $R^2$: el coeficiente de determinación es de `r summary(Modelo1_2)$r.squared`, lo cual nos deja con que la variable `indus` explica, aproximadamente un $33$% de la varianza de la variable respuesta.
+
+- **Contraste del modelo:** obtenemos un $p$-valor prácticamente nulo, por tanto hay evidencia estadística en contra de que todos los coeficientes del modelo sean nulos, por tanto se acepta la hipótesis alternativa del contraste y es que hay al menos una variable con coeficiente no nulo.
+
+### Apartado 1.3
+
+```{r Apartado 1.3 Graficos}
+# Dibujamos los datos (azul) con la recta de regresión (rojo)
+with(boston, plot(indus, crim, col='blue', main="Recta de Regresión y bandas de confianza"))
+abline(coef=coefficients(Modelo1_2), col='red')
+
+# Ahora las bandas de confianza
+bandas_conf <- predict(Modelo1_2, newdata = boston, interval = "confidence")
+lines(boston$indus, bandas_conf[,2], col='green')
+lines(boston$indus, bandas_conf[,3], col='green')
+```
+
+### Apartado 1.4
+
+Debemos hacer un diagnóstico de los residuos, entonces, primero extraemos tanto los residuos normalizados como los _studentizados_, y después los graficamos junto con los valores predichos para ver si se detecta heterocedasticidad.
+
+```{r Heterocedasticidad de los residuos 1.4}
+
+Residuos_Estandarizados <- rstandard(Modelo1_2)
+Residuos_Studentizados <- rstudent(Modelo1_2)
+
+# Gráficas
+par(mfrow=c(1,2))
+plot(Modelo1_2$fitted.values, Residuos_Estandarizados)
+abline(h=0, col="red") 
+plot(Modelo1_2$fitted.values, Residuos_Studentizados)
+abline(h=0, col="red") 
+
+# Podemos aplicar también el test Breusch-Pagan
+Resultado_TestBP <- bptest(Modelo1_2)
+```
+
+A juzgar por las gráficas sí que pareciera que hay un aumento de la varianza de los errores con forme aumenta el valor de la predicción, esta sospecha queda corroborada por el contraste de Breusch-Pagan, del cual obtenemos un $p$-valor de `r Resultado_TestBP$p.value`, que es mucho menor que el nivel de significancia, por tanto hay evidencia estadística en contra de la hipótesis nula, que es la homocedasticidad. Así **los residuos son heterocedásticos**.
+
+Sobre la normalidad de los residuos podemos hacer un gráfico $QQ$ con los residuos estandarizados para ver si se ajustan correctamente:
+
+```{r Análisis de la normalidad aparatado 1.4}
+# Primero hacemos la gráfica QQ
+qqnorm(Residuos_Studentizados)
+qqline(Residuos_Studentizados,col="red")
+
+# Después el contraste de hipótesis de Shapiro-Wilk nos puede ayudar a salir de dudas
+Resultado_TestSW <- shapiro.test(Residuos_Studentizados)
+```
+
+se observa que la mayoría de puntos caen en la recta, sin embargo hay un grupo para nada despreciable el cual se aleja mucho de ser normal, esto nos puede hacer sospechar que se viola la hipótesis de normalidad. Para salir de dudas tenemos el contraste de hipótesis de Shapiro-Wilk, del cual obtenemos un $p$-valor de `r Resultado_TestSW$p.value`, que es mucho menor que $0.05$, de manera que hay evidencia estadística en contra de la normalidad de los residuos.
+
+Por último, sobre los _outliers_ o datos atípicos, vemos en las gráficas que hay unos pocos datos con errores estandarizados y _studentizados_ mayores que $3$, lo cual nos hace pensar que podrían ser atípicos.
+
+```{r Análisis de datos atípicos apartado 1.4}
+# Gráfico de los Leverages
+n<-nrow(boston)
+plot(fitted(Modelo1_2),hatvalues(Modelo1_2),main="leverages vs fitted")
+
+abline(h=2*3/n,col="red",lwd=1);  
+abline(h=3*3/n,col="red",lwd=3);
+
+boxplot(hatvalues(Modelo1_2), main="BoxPlot Leverages")   
+summary(hatvalues(Modelo1_2))
+
+# Gráfico de la distancia de Cook
+plot(fitted(Modelo1_2),cooks.distance(Modelo1_2),main="Distancia de Cook vs fitted")
+abline(h=1,col="red",lwd=1);
+boxplot(cooks.distance(Modelo1_2), main="BoxPlot Distancia de Cook")
+summary(cooks.distance(Modelo1_2))
+  
+Observaciones_Influyentes <- summary(influence.measures(Modelo1_2))
+```
+
+Entonces, en todos los gráficos se ven un grupo de observaciones atípicas, que podemos sospechar que siempre son las mismas. Y son las filas que vemos en la última tabla.
+
+**SOLUCIONES:**
+
+Para los diferentes problemas que hemos ido encontrando podemos intentar darles distintas soluciones.
+
+- Para el caso de la falta de normalidad no hay solución.
+
+- Para los datos atípicos podemos simplemente eliminar esos registros, tras haberlos localizado se ve que no son muchos en comparación con el número total de registros que tenemos, por tanto podemos eliminarlos sin perder mucha información.
+
+- Por último, para la heterocedasticidad podemos intentar aplicar una transformación a nuestros datos de la variable respuesta. Podría ser la transformación logarítmica o la raíz cuadrada, también como la variable respuesta es no negativa nos podemos plantear aplicar una transformación Box-Cox encontrando un $\lambda$ óptimo.
+
+```{r Aplicando la transformación BoxCox apartado 1.4}
+b<-boxcox(Modelo1_2, lambda = seq(-2,2, length = 10))
+lambda <- b$x[which.max(b$y)]
+
+Modelo1_BoxCox <- lm(I((crim^lambda - 1) / lambda) ~ indus, data = boston)
+plot(fitted(Modelo1_BoxCox), rstudent(Modelo1_BoxCox))
+Resultado_TestBP_ConBoxCox <- bptest(Modelo1_BoxCox) 
+```
+Entonces haciendo una elección del $\lambda$ correcta usando el método de máxima verosimilitud, vemos que obtenemos un valor de $\lambda=$`r lambda`. Haciendo la transformación de Box-Cox para el valor deducido de $\lambda$, vemos las gráficas anteriores, y se obtienen unos mejores resultados, y el contraste de hipótesis resulta en un $p$-valor de `r Resultado_TestBP_ConBoxCox$p.value`, que es mucho mayor que el nivel de significancia, por tanto, aceptamos que hay homocedasticidad.
 
 
 # Ejercicio 2
@@ -84,15 +228,150 @@ abline(h=0,lty=2)
 
 ## 2.5
 ```{r 2.5}
-# No es adecuada regresión lineal, ya que los datos no siguen una distribución lineal. Debido a eso hemos decidido realizar una transformación logaritmica a la variable `crim`.
+# No es adecuado realizar regresión lineal ya que los datos no siguen una distribución lineal. Debido a eso hemos decidido realizar una transformación logaritmica a la variable `crim`.
 ```
 
 ## 2.6
 ```{r 2.6}
 nuevos2 <- data.frame(medv = c(30000, 10000, 100000)/10000) # los valores de medv son entre 10000$ 
-pred_2 <- predict(lm_b2, nuevos2, interval = "confidence", level = 0.90)
-cat("Con un intervalo de confianza de 90% obtenemos que la tasa de criminalidad esperada está entre", pred_2[1,"lwr"], "y", pred_2[1,"upr"]) # corregir esto
+pred_2 <- predict(lm_b2, log(nuevos2), interval = "confidence", level = 0.90)
+cat("Con un intervalo de confianza de 90% obtenemos que la tasa de criminalidad esperada está en cada caso:",
+    "\n30000€: entre", pred_2[1,"lwr"], "y", pred_2[1,"upr"],
+    "\n10000€: entre", pred_2[2,"lwr"], "y", pred_2[2,"upr"],
+    "\n100000€: entre", pred_2[3,"lwr"], "y", pred_2[3,"upr"])
 ```
+
+# Ejercicio 3
+
+## 3.1
+```{r}
+full_model <- lm(crim ~ ., data = boston, na.action = na.exclude)
+lm_b3 <- regsubsets(crim ~ . , data=boston, nvmax = 10, method = "forward")
+resumen<-summary(lm_b3)
+
+resultado <- cbind(resumen$rsq, resumen$cp, resumen$bic)
+colnames(resultado) <- c('Rsq','Cp','BIC')
+
+# Dibujamos los valores obtenidos por los modelos
+
+plot(1:10, resumen$cp, xlab = "# Variables", main = "Cp de Mallows",
+type='b')
+abline(v = which.min(resumen$cp), col = 2)
+
+plot(1:10, resumen$rsq, xlab = "# Variables", main = "R2",
+type='b')
+abline(v = which.max(resumen$rsq), col = 2)
+
+plot(1:10, resumen$bic, xlab = "# Variables", main = "BIC",
+type='b')
+abline(v = which.min(resumen$bic), col = 2)
+
+
+colnames(resumen$which)[resumen$which[6,]==T]
+
+best_model <- lm(crim ~ indus+chas+nox+rm+ptratio+lstat, data=boston, na.action=na.exclude )
+best_resumen <- summary(best_model)
+
+BIC(best_model) # No obtenemos el mismo valor que en el regsubset de 6 variables ya que este simplifica el resultado restando un valor constante 
+ols_mallows_cp(best_model, full_model)
+best_resumen$r.squared
+
+best_resumen # Con el resumen del modelo podemos observar que los contrastes de hipótesis indican que todos los coeficientes de todas las variables son no nulos, con la única excepción de la variable nox que a juzgar por el alto valor de su coeficiente tiene gran influencia en los resultados.
+
+# Podemos comprobar si la variable nox es significativa.
+prueba<-update(best_model,~.-nox)
+anova(prueba,best_model,test="F")
+
+# Obtenemos un p-value de 0.219, por lo que podemos concluir que la variable nox no es significativa
+best_model<-update(best_model,~.-nox)
+```
+
+## 3.2
+```{r}
+lm_step <- step(full_model, method = "forward")
+resumen_2<-summary(lm_step)
+
+resumen_2 # Obtenemos un modelo de 8 variables. Este solo se diferencia del modelo de 8 variables de regsubsets en que incluye age en lugar de nox. Por tanto resultan en modelos similares y explican prácticamente la misma cantidad de variabilidad para la variable crim. Por lo tanto nos quedamos con el modelo de regsubsets al contar con menos variables.
+
+# El modelo obtenido explica un 60.3% de la varianza de crim
+
+# El efecto de chas sobre crim es de -2.23558, una dependencia negativa
+```
+
+## 3.3
+```{r}
+res_student_step <- rstudent(lm_step)
+
+# Gráfica residuos
+plot(lm_step$fitted.values, res_student_step)
+abline(h=0, col="red") 
+
+# Podemos aplicar también el test Breusch-Pagan
+res_bp_step <- bptest(lm_step)
+res_bp_step
+
+# Con la gráfica de los residuos y el test BP observamos claramente que no hay heterocedasticidad
+
+
+# Gráfica QQ
+qqnorm(res_student_step)
+qqline(res_student_step,col="red")
+# Vemos que la mayoría de puntos caen en la línea pero en los extremos se alejan bastante, lo cual nos hace sospechar que no hay normalidad
+
+# Después el contraste de hipótesis de Shapiro-Wilk nos puede ayudar a salir de dudas
+res_sw_step <- shapiro.test(res_student_step)
+res_sw_step
+
+# Con la gráfica de los residuos y el test SW observamos claramente que no hay distribución normal de los residuos
+
+
+# Gráfico de outliers
+plot(lm_step$fitted.values, abs(res_student_step)) 
+abline(h = 3,col="red",lwd=1)
+
+# Aquellos valores absolutos mayores a 3 pueden considerarse outliers. Obtenemos 6 outliers en nuestros residuos.
+```
+
+## 3.4
+```{r}
+# No podemos solucionar la presencia de no normalidad
+
+# Para solucionar la no heterocedasticidad realizamos un test de BoxCox
+b<-boxcox(lm_step, lambda = seq(-2,2, length = 10))
+lambda <- b$x[which.max(b$y)]
+
+boxcox_step <- lm(I((crim^lambda - 1) / lambda) ~ indus + chas + rm + age + dis + ptratio + lstat + medv, data = boston)
+plot(fitted(boxcox_step), rstudent(boxcox_step))
+resultado_boxcox_step <- bptest(boxcox_step)
+
+# Con el p-value del test BoxCox podemos concluir que los residuos son homocedasticos
+
+# Para los outliers la única solución sería eliminar los valores correspondientes a estos, pero sería necesario rehacer los modelos tras esto. 
+```
+
+## 3.5
+```{r}
+med_indus <- median(boston$indus, na.rm = TRUE)
+med_nox <- median(boston$nox, na.rm = TRUE)
+med_rm <- median(boston$rm, na.rm = TRUE)
+med_ptratio <- median(boston$ptratio, na.rm = TRUE)
+med_lstat <- median(boston$lstat, na.rm = TRUE)
+
+nuevos3 <- data.frame(indus = rep(med_indus, 2),
+                           nox = rep(med_nox, 2), 
+                           rm = rep(med_rm, 2),
+                           ptratio = rep(med_ptratio, 2),
+                           lstat = rep(med_lstat, 2),
+                           chas = c(0, 1))
+
+pred_3 <- predict(best_model, newdata = nuevos3, interval = "confidence", level = 0.95)
+cat("Con un intervalo de confianza de 95% obtenemos que la tasa de criminalidad esperada está en cada caso:",
+    "\nCaso con chas = 0: entre", pred_3[1,"lwr"], "y", pred_3[1,"upr"],
+    "\nCaso con chas = 1: entre", pred_3[2,"lwr"], "y", pred_3[2,"upr"])
+```
+
+
+
 
 
 
