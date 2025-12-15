@@ -262,7 +262,7 @@ nuevos2 <- data.frame(medv = c(30000, 10000, 100000)/10000)
 # Realizamos la predicción de los resultados
 pred_log_2 <- predict(lm_b2, nuevos2, interval = "confidence", level = 0.90)
 
-# Para interpretar bien los resultados aplicamos una transformación exponencial para volver a la escala de original de `crim`
+# Para interpretar bien los resultados aplicamos una transformación exponencial para volver a la escala de original de crim
 pred_2 <- exp(pred_log_2)
 
 cat("Con un intervalo de confianza de 90% obtenemos que la tasa de criminalidad esperada está en cada caso:",
