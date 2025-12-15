@@ -2,20 +2,16 @@
 title: "Tarea"
 author: "Óscar Camacho, Juan Alcaraz"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
-boston <- readxl::read_xlsx("./boston.xlsx")
-
-library(leaps)
-library(olsrr)
-```
-## IMPORTACIÓN DE LOS DATOS
+## Importación de los datos
 
 ```{r Importación de las librerías}
 library(MASS)
@@ -23,8 +19,9 @@ library(readxl)
 library(ggplot2)
 library(lmtest)
 library(car)
+library(leaps)
+library(olsrr)
 ```
-
 
 ```{r Importación de los datos}
 boston <- read_excel("boston.xlsx", col_types = c("numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric"))
@@ -32,7 +29,7 @@ boston$chas <- as.factor(boston$chas)
 ```
 
 
-## EJERCICIO 1
+## Ejercicio 1
 
 Para saber la variable que tiene mayor dependencia lineal de `crim` debemos usar la correlación, que en R se calcula con el comando `cor`. Entonces:
 
@@ -165,31 +162,45 @@ Resultado_TestBP_ConBoxCox <- bptest(Modelo1_BoxCox)
 Entonces haciendo una elección del $\lambda$ correcta usando el método de máxima verosimilitud, vemos que obtenemos un valor de $\lambda=$`r lambda`. Haciendo la transformación de Box-Cox para el valor deducido de $\lambda$, vemos las gráficas anteriores, y se obtienen unos mejores resultados, y el contraste de hipótesis resulta en un $p$-valor de `r Resultado_TestBP_ConBoxCox$p.value`, que es mucho mayor que el nivel de significancia, por tanto, aceptamos que hay homocedasticidad.
 
 
-# Ejercicio 2
+## Ejercicio 2
 
-## 2.1
-```{r 2.1}
-boston
+### Apartado 2.1
 
+```{r Apartado 2.1}
+# Ajuste modelo
+lm_b2 <- lm(crim ~ medv, data = boston, na.action=na.exclude)
 
-#Ajuste modelo. Hacemos log(crim) ya que los datos de crim no se distribuyen linealmente
-lm_b2 <- lm(log(crim) ~ medv, data = boston, na.action=na.exclude)
-
-#Representación del ajuste. Necesitamos volver a hacer log(crim) si queremos un ajuste lineal
-plot(boston$medv, log(boston$crim),
+# Representación del ajustel
+plot(boston$medv, boston$crim,
      col="blue",
      main="Relación Valor Vivienda - Criminalidad",
      xlab="Valor Mediano de la Vivienda",
      ylab="Tasa de Criminalidad")
-
-#Resumen Modelo
+# Resumen Modelo
 summary(lm_b2)
+```
+La variable `medv` tiene una relación negativa con `crim`. A medida que el valor de las viviendas aumenta, la tasa de criminalidad disminuye significativamente. Sin embargo, la criminalidad cae muy rápidamente al principio y luego se estabiliza cerca de cero para valores altos de vivienda, lo que sugiere una relación exponencial o logarítmica. Será necesario aplicar una transformación logarítmica para obtener unos resultados que se puedan ajustar linealmente.
 
-# Tenemos una relación negativa, al aumentar el precio medio de la vivienda disminuye la criminalidad logarítmicamente con una pendiente de -0.1092 y ordenada en el origen de 1.6954
+```{r Apartado 2.1 con log(crim)}
+# Volvemos a hacer el ajuste ahora con log(crim)
+lm_b2 <- lm(log(crim) ~ medv, data = boston, na.action=na.exclude)
+
+# Con log(crim) obtenemos una representación lineal
+plot(boston$medv, log(boston$crim),
+     col="blue",
+     main="Relación Valor Vivienda - Criminalidad",
+     xlab="Valor Mediano de la Vivienda",
+     ylab="Tasa de Criminalidad (escala logarítmica)")
+
+# Resumen Modelo con log(crim)
+summary(lm_b2)
 ```
 
-## 2.2
-```{r 2.2}
+Tenemos una pendiente negativa, por lo que al aumentar `medv`, `crim` disminuye exponencialmente con una pendiente de -0.1092 y ordenada en el origen de 1.6954.
+
+### Apartado 2.2
+
+```{r Apartado 2.2}
 plot(boston$medv, log(boston$crim),
      col="blue",
      main="Relación Valor Vivienda - Criminalidad",
@@ -199,55 +210,72 @@ abline(coef=coef(lm_b2), col="red")
 
 summary(lm_b2)
 
-# Obtenemos un R2 de 0.2859, bastante bajo como para confirmar una correlación entre los datos.
-
 conf_90 <- confint(lm_b2,level=0.90)
 print(conf_90)
-# Como vemos con un intervalo de confianza de 90% la pendiente es claramente negativa.
 ```
 
-## 2.3
-```{r 2.3}
+Obtenemos un valor de $R^2$ de 0.2859, bastante bajo como para confirmar una correlación entre los datos.
+Además podemos afirmar con un intervalo de confianza de $90\%$ que la pendiente es claramente negativa.
+
+Por otra parte, el $p$-valor es prácticamente nulo y por tanto hay evidencia estadística en contra de que todos los coeficientes del modelo sean nulos. Podemos aceptar la hipótesis alternativa del contraste: hay al menos una variable con coeficiente no nulo.
+
+### Apartado 2.3
+
+```{r Apartado 2.3}
 #Obtención de bandas de estimación:
 minx<-range(boston$medv)[1]; maxx<-range(boston$medv)[2]
 nuevos <- data.frame(list(medv = seq(minx,maxx,length=100)))
 bandas_est<-predict(lm_b2, newdata = nuevos, interval = "confidence")
 
 #Representación gráfica:
-plot(boston$medv, log(boston$crim), col='BLUE')
-abline(coef=coef(lm_b2), col='RED')
-lines(nuevos$medv,bandas_est[,2],col='BLACK')
-lines(nuevos$medv,bandas_est[,3],col='BLACK')
-```
-## 2.4
-```{r 2.4}
-residuos_2 <- residuals(lm_b2)
-predichos_2 <- fitted.values(lm_b2)
-plot(predichos_2,residuos_2, col='BLUE',main = 'Gráfica de residuos')
-abline(h=0,lty=2)
-
-# Análisis pendiente
+plot(boston$medv, log(boston$crim), col="blue")
+abline(coef=coef(lm_b2), col="red")
+lines(nuevos$medv,bandas_est[,2],col="black")
+lines(nuevos$medv,bandas_est[,3],col="black")
 ```
 
-## 2.5
-```{r 2.5}
-# No es adecuado realizar regresión lineal ya que los datos no siguen una distribución lineal. Debido a eso hemos decidido realizar una transformación logaritmica a la variable `crim`.
+### Apartado 2.4
+
+```{r Apartado 2.4}
+par(mfrow=c(1,2))
+plot(lm_b2, which=1) # Residuals vs Fitted
+plot(lm_b2, which=2) # QQ Plot
+par(mfrow=c(1,1))
 ```
 
-## 2.6
-```{r 2.6}
-nuevos2 <- data.frame(medv = c(30000, 10000, 100000)/10000) # los valores de medv son entre 10000$ 
-pred_2 <- predict(lm_b2, log(nuevos2), interval = "confidence", level = 0.90)
+En el gráfico de la izquierda observamos que los residuos forman una "U", indicando que estos no son lineales y por tanto que en el ajuste se están subestimando los valores en los extremos y sobreestimando los centrales (o al revés). Faltarían más términos en el modelo o aplicar otra transformación a las variables para capturar mejor la curvatura.
+
+El gráfico de la derecha tiene la mayoría de puntos sobre la línea diagonal a excepción de los extremos que se desvían de esta. Por tanto el supuesto de normalidad no se está cumpliendo estrictamente.
+
+En ambos gráficos podemos ver que los valores con índice 103, 127 y 128 se consideran outliers debido a sus grandes residuos.
+
+### Apartado 2.5
+
+Como se ha explicado antes, no es adecuado realizar regresión lineal ya que la relación entre las variables no sigue una distribución lineal. Debido a eso hemos decidido realizar una transformación logaritmica a la variable `crim` en los apartados anteriores.
+
+### Apartado 2.6
+
+```{r Apartado 2.6}
+# Los valores de medv en el dataset se expresan entre 10000$ 
+nuevos2 <- data.frame(medv = c(30000, 10000, 100000)/10000)
+
+# Realizamos la predicción de los resultados
+pred_log_2 <- predict(lm_b2, nuevos2, interval = "confidence", level = 0.90)
+
+# Para interpretar bien los resultados aplicamos una transformación exponencial para volver a la escala de original de `crim`
+pred_2 <- exp(pred_log_2)
+
 cat("Con un intervalo de confianza de 90% obtenemos que la tasa de criminalidad esperada está en cada caso:",
     "\n30000€: entre", pred_2[1,"lwr"], "y", pred_2[1,"upr"],
     "\n10000€: entre", pred_2[2,"lwr"], "y", pred_2[2,"upr"],
     "\n100000€: entre", pred_2[3,"lwr"], "y", pred_2[3,"upr"])
 ```
 
-# Ejercicio 3
+## Ejercicio 3
 
-## 3.1
-```{r}
+### Apartado 3.1
+
+```{r Apartado 3.1}
 full_model <- lm(crim ~ ., data = boston, na.action = na.exclude)
 lm_b3 <- regsubsets(crim ~ . , data=boston, nvmax = 10, method = "forward")
 resumen<-summary(lm_b3)
@@ -289,8 +317,9 @@ anova(prueba,best_model,test="F")
 best_model<-update(best_model,~.-nox)
 ```
 
-## 3.2
-```{r}
+### Apartado 3.2
+
+```{r Apartado 3.2}
 lm_step <- step(full_model, method = "forward")
 resumen_2<-summary(lm_step)
 
@@ -301,8 +330,9 @@ resumen_2 # Obtenemos un modelo de 8 variables. Este solo se diferencia del mode
 # El efecto de chas sobre crim es de -2.23558, una dependencia negativa
 ```
 
-## 3.3
-```{r}
+### Apartado 3.3
+
+```{r Apartado 3.3}
 res_student_step <- rstudent(lm_step)
 
 # Gráfica residuos
@@ -335,8 +365,9 @@ abline(h = 3,col="red",lwd=1)
 # Aquellos valores absolutos mayores a 3 pueden considerarse outliers. Obtenemos 6 outliers en nuestros residuos.
 ```
 
-## 3.4
-```{r}
+### Apartado 3.4
+
+```{r Apartado 3.4}
 # No podemos solucionar la presencia de no normalidad
 
 # Para solucionar la no heterocedasticidad realizamos un test de BoxCox
@@ -352,8 +383,10 @@ resultado_boxcox_step <- bptest(boxcox_step)
 # Para los outliers la única solución sería eliminar los valores correspondientes a estos, pero sería necesario rehacer los modelos tras esto. 
 ```
 
-## 3.5
-```{r}
+### Apartado 3.5
+
+```{r Apartado 3.5}
+# Escogemos las variables obtenidas por regsubsets y calculamos sus valores medianos
 med_indus <- median(boston$indus, na.rm = TRUE)
 med_nox <- median(boston$nox, na.rm = TRUE)
 med_rm <- median(boston$rm, na.rm = TRUE)
@@ -365,7 +398,7 @@ nuevos3 <- data.frame(indus = rep(med_indus, 2),
                            rm = rep(med_rm, 2),
                            ptratio = rep(med_ptratio, 2),
                            lstat = rep(med_lstat, 2),
-                           chas = c(0, 1))
+                           chas = as.factor(c(0, 1))) # Consideramos `chas` como variable categórica
 
 pred_3 <- predict(best_model, newdata = nuevos3, interval = "confidence", level = 0.95)
 cat("Con un intervalo de confianza de 95% obtenemos que la tasa de criminalidad esperada está en cada caso:",
